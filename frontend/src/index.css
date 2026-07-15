@@ -1,0 +1,9 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, Helvetica, Arial, sans-serif;
+  background: #f8f8f8;
+  color: #222;
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,141 @@
+# AshFash App — Full Build Summary
+
+## What We Built
+A fashion shopping web app called **AshFash** with:
+- **Backend:** Python + Flask REST API
+- **Database:** MySQL (via SQLAlchemy ORM)
+- **External Data:** Fake Store API (free, no auth required)
+- **Frontend:** React (Vite)
+
+---
+
+## Backend Architecture
+
+### Pattern: Application Factory
+Instead of one big `app.py`, we used `create_app()` in `app/__init__.py`. This is the Flask best practice — it lets you create different app instances for different environments (dev, test, prod) without global state.
+
+### Blueprints
+Flask routes were split into separate files registered as blueprints:
+- `/api/v1/products` — browse & search
+- `/api/v1/categories` — category tree
+- `/api/v1/filters` — available filter values
+- `/api/v1/admin/sync/*` — data sync triggers (protected)
+- `/api/v1/health` — DB connectivity check
+
+### Config Pattern
+Three configs all inheriting from `BaseConfig`:
+- `DevelopmentConfig` — MySQL, debug on
+- `ProductionConfig` — MySQL, debug off
+- `TestingConfig` — SQLite in-memory (for fast tests, no DB needed)
+
+---
+
+## Database Design
+
+### Models
+- **Category** — self-referential tree (parent_id FK → itself), with `external_id`, `slug`, `gender` enum
+- **Product** — stores name, price, sale price, image URL, gender, brand, colour, raw API JSON
+- **ProductImage** — one-to-many per product
+- **ProductSize** — size label + availability per product
+- **SyncLog** — audit trail for every sync job
+- **ApiRateTracker** — one row per month, tracks API calls used vs limit
+
+### Key MySQL features used
+- `FULLTEXT` index on product name/brand/description for text search (`MATCH ... AGAINST`)
+- `UNIQUE` constraints on `external_id` and `slug` for safe upserts
+- `ON DUPLICATE KEY UPDATE` pattern for idempotent syncing
+
+---
+
+## External API Strategy
+
+### Why cache instead of calling live?
+The free tier has a 500 req/month limit. Calling the API on every user request would exhaust it instantly. Instead:
+1. Admin triggers a sync → fetches from external API → stores in MySQL
+2. All user requests hit MySQL only
+3. Search miss fallback: if no local results, call API, cache results, return
+
+### API Journey (what went wrong)
+1. **ASOS via RapidAPI** — got 403 (not subscribed), then 404 (wrong endpoint path), then found response structure was completely different than docs said (navigation tree instead of product list), then discovered products endpoint returned 204 for all inputs (broken), then found out it costs money
+2. **Switched to Fake Store API** — free, no key needed, flat JSON. First sync returned 0 products because we were passing URL slugs (`womens-clothing`) when the API needed the original name (`women's clothing`). Fixed by looking up the category name from the DB and using that directly.
+
+---
+
+## API Design
+
+### Standard Response Envelope
+Every endpoint returns:
+```json
+{
+  "success": true,
+  "data": [...],
+  "meta": { "page": 1, "per_page": 20, "total": 14, "total_pages": 1 },
+  "error": null
+}
+```
+This makes frontend consumption predictable.
+
+### Admin Protection
+Admin sync endpoints check for `X-Admin-Key` header against an env var. Simple but effective for an MVP.
+
+---
+
+## Testing
+- **pytest + pytest-flask** for the test runner
+- `conftest.py` creates a fresh SQLite in-memory DB per test session
+- Tests mock `requests.get` so no real HTTP calls are made
+- 14 tests: product filtering, search, 404 handling, sync service logic
+
+---
+
+## Frontend (React + Vite)
+
+### Why Vite over Create React App?
+CRA timed out repeatedly. Vite is faster (uses native ES modules), simpler config, and actively maintained. CRA is effectively deprecated.
+
+### Component Structure
+```
+src/
+├── api.js              — all fetch calls (one place)
+├── hooks/
+│   └── useProducts.js  — data fetching + loading/error state
+├── components/
+│   ├── ProductCard.jsx
+│   ├── FilterSidebar.jsx
+│   └── SearchBar.jsx
+└── pages/
+    └── Home.jsx        — assembles everything
+```
+
+### Vite Proxy
+Instead of hardcoding `http://localhost:5000` in every fetch call (which also causes CORS issues), we configured Vite to proxy `/api/*` → `http://localhost:5000`. Frontend uses relative URLs like `/api/v1/products`.
+
+---
+
+## Errors & Fixes (Interview-Worthy)
+
+| Error | Root Cause | Fix |
+|-------|-----------|-----|
+| `unsigned=True` TypeError | Not a valid SQLAlchemy Column kwarg | Removed it |
+| `DATABASE_URL=DATABASE_URL=mysql+...` | Duplicate key in `.env` | Edited .env directly |
+| `mysql: command not found` | MySQL binary not in PATH | Added `/usr/local/mysql/bin` to `~/.zshrc` |
+| Homebrew readline patch error | macOS 12 outdated Command Line Tools | Installed MySQL via DMG instead |
+| ASOS 403 Forbidden | Not subscribed to the API plan | Subscribed (then switched APIs entirely) |
+| `NoneType` has no attribute `get` | API response had explicit `null` values, not missing keys | Used `(obj.get('key') or {}).get('field')` |
+| Products fetched = 0 | Passing slugs (`womens-clothing`) to API that expects `women's clothing` | Look up category name from DB, use `cat.name.lower()` |
+| `new URL('/api/v1/products')` throws TypeError | `new URL()` requires absolute URL when no base given | Added `window.location.origin` as second argument |
+| "Unexpected end of JSON input" | `res.json()` called on empty response body | Read as text first, then parse — gives better error message |
+
+---
+
+## Key Interview Topics This Project Covers
+- **Flask application factory pattern** and blueprints
+- **SQLAlchemy ORM** — models, relationships, upserts, FULLTEXT search
+- **Database migrations** with Flask-Migrate (Alembic under the hood)
+- **API rate limiting strategy** — local caching to protect quota
+- **REST API design** — consistent envelopes, proper HTTP status codes, pagination
+- **Environment config** — `.env`, never hardcode secrets, per-environment configs
+- **Testing** — pytest fixtures, mocking external HTTP calls, in-memory DB for speed
+- **React hooks** — custom hook for data fetching (`useProducts`)
+- **Vite proxy** — avoiding CORS in development without touching Flask CORS config
+- **Debugging** — reading HTTP status codes, checking response bodies, isolating whether errors come from frontend, proxy, or backend
