@@ -106,3 +106,30 @@ def remove_item(external_id):
         cursor.execute("UPDATE products SET is_active = 0 WHERE external_id = %s", (external_id,))
         conn.commit()
     return success_response({'deactivated': external_id})
+
+@bp.post('/admin/products/<external_id>/sizes')
+def add_size(external_id):
+    if err := _check_admin_key():
+        return err
+    data = request.get_json(silent=True) or {}
+    size_label = data.get('size_label')
+    if not size_label:
+        return error_response('size_label is required', 400)
+    conn = get_db()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT id FROM products WHERE external_id = %s", (external_id,))
+        product = cursor.fetchone()
+        if not product:
+            return error_response('Product not found', 404)
+        product_id = product['id']
+
+        cursor.execute(
+            "SELECT COUNT(*) AS total FROM product_sizes WHERE product_id = %s AND size_label = %s", (product_id, size_label)
+        )
+        count = cursor.fetchone()['total']
+        if count == 0:
+            cursor.execute("INSERT INTO product_sizes(product_id, size_label, is_available) VALUES (%s, %s, 1)", (product_id, size_label))
+        else:
+            return error_response('Size already exists', 400)
+        conn.commit()
+        return success_response('Size updated', 200)

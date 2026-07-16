@@ -9,21 +9,39 @@ bp = Blueprint('products', __name__)
 def list_products():
     where, params = _build_filters()
     sort_clause = _sort_clause()
+    page, page_size = _pagination_params()
+    limit = page_size
+    offset = (page - 1) * page_size
 
     conn = get_db()
     with conn.cursor() as cursor:
+        cursor.execute(
+            f'''SELECT COUNT(*) as total
+                FROM products p
+                WHERE {where}''',
+            params
+        )
+        total = cursor.fetchone()['total']
+
         cursor.execute(
             f'''SELECT p.id, p.external_id, p.name, p.brand, p.external_url,
                        p.primary_image_url, p.price_amount, p.price_currency,
                        p.sale_price_amount, p.category_id, p.gender, p.colour
                 FROM products p
                 WHERE {where}
-                ORDER BY {sort_clause}''',
-            params
+                ORDER BY {sort_clause}
+                LIMIT %s OFFSET %s''',
+            params + (limit, offset)
         )
         rows = cursor.fetchall()
 
-    return success_response([_format_product(r) for r in rows])
+    meta = {
+        'page': page,
+        'page_size': page_size,
+        'total': total,
+        'total_pages': (total + page_size - 1) // page_size,
+    }
+    return success_response([_format_product(r) for r in rows], meta=meta)
 
 @bp.get('/products/sale_items')
 def sale_products():
@@ -254,6 +272,25 @@ def _build_filters():
         params.append(size)
 
     return ' AND '.join(conditions), tuple(params)
+
+
+def _pagination_params():
+    args = request.args
+
+    try:
+        page = int(args.get('page', 1))
+    except ValueError:
+        page = 1
+    if page < 1:
+        page = 1
+
+    try:
+        page_size = int(args.get('page_size', 20))
+    except ValueError:
+        page_size = 20
+    page_size = max(1, min(page_size, 100))
+
+    return page, page_size
 
 
 def _sort_clause():
