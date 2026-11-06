@@ -1,4 +1,4 @@
-from app.routes import health, products, categories, filters, admin
+from app.routes import health, products, categories, filters, admin, stylist
 
 
 def register_blueprints(app):
@@ -8,3 +8,4 @@ def register_blueprints(app):
     app.register_blueprint(categories.bp, url_prefix=prefix)
     app.register_blueprint(filters.bp, url_prefix=prefix)
     app.register_blueprint(admin.bp, url_prefix=prefix)
+    app.register_blueprint(stylist.bp, url_prefix=prefix)

@@ -67,6 +67,12 @@ def sample_product(db, sample_category):
 def _apply_schema(conn):
     with open('app/db_schema.sql') as f:
         sql = f.read()
+    # Strip comment lines before splitting on ';'. Leading comment lines
+    # don't end in ';', so they get bundled into the same chunk as the next
+    # real statement - without this, that whole chunk starts with '--' and
+    # the check below silently skips it, comment AND statement together
+    # (this was dropping the `categories` table entirely).
+    sql = '\n'.join(line for line in sql.splitlines() if not line.strip().startswith('--'))
     with conn.cursor() as cursor:
         cursor.execute('SET FOREIGN_KEY_CHECKS = 0')
         for stmt in sql.split(';'):

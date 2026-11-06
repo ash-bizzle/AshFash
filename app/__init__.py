@@ -1,12 +1,17 @@
 import os
+from dotenv import load_dotenv
+
+# Must run before `app.config` is imported - config.py reads env vars at
+# module-import time, so loading .env any later means every setting in it
+# (DATABASE_URL, RAPIDAPI_KEY, ANTHROPIC_API_KEY, ...) silently falls back
+# to its hardcoded default instead.
+load_dotenv()
+
 from flask import Flask
 from flask_cors import CORS
-from dotenv import load_dotenv
 
 from app.config import config_map
 from app.db import close_db
-
-load_dotenv()
 
 
 def create_app(config_name=None):

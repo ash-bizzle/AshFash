@@ -29,6 +29,9 @@ class BaseConfig:
     API_MONTHLY_LIMIT = int(os.getenv('API_MONTHLY_LIMIT', 500))
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5173')
     ADMIN_SECRET_KEY = os.getenv('ADMIN_SECRET_KEY', 'change_me')
+    ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+    STYLIST_MODEL = os.getenv('STYLIST_MODEL', 'claude-haiku-4-5-20251001')
+    STYLIST_MAX_ITERATIONS = int(os.getenv('STYLIST_MAX_ITERATIONS', 6))
 
 
 class DevelopmentConfig(BaseConfig):

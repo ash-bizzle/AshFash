@@ -1,11 +1,11 @@
 const BASE_URL = 'http://localhost:5000/api/v1';
 
-async function apiFetch(path, params = {}) {
+async function apiFetch(path, params = {}, options = {}) {
   const url = new URL(`${BASE_URL}${path}`);
   Object.entries(params).forEach(([k, v]) => {
     if (v !== '' && v !== null && v !== undefined) url.searchParams.set(k, v);
   });
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), options);
   const text = await res.text();
   if (!text) throw new Error(`Empty response from ${path} (status ${res.status})`);
   let json;
@@ -23,3 +23,8 @@ export const searchProducts = (q, params) => apiFetch('/products/search', { q, .
 export const getProduct = (id) => apiFetch(`/products/${id}`);
 export const getCategories = () => apiFetch('/categories');
 export const getFilters = (params) => apiFetch('/filters', params);
+export const askStylist = (message) => apiFetch('/stylist', {}, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ message }),
+});

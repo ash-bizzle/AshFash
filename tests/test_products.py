@@ -16,7 +16,7 @@ def test_list_products_returns_item(client, sample_product):
 
 
 def test_filter_by_brand(client, sample_product):
-    resp = client.get('/api/v1/products?brand=ASOS+DESIGN')
+    resp = client.get('/api/v1/products?brand=Uniqlo')
     assert resp.get_json()['meta']['total'] == 1
 
     resp = client.get('/api/v1/products?brand=Unknown')
